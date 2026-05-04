@@ -1,4 +1,4 @@
-\documentclass[12pt]{article}
+\documentclass[10pt]{article}
 \usepackage{amsmath}
 \usepackage{amssymb}
 \usepackage{fancyhdr}
@@ -12,11 +12,15 @@
 \usepackage[table]{xcolor}
 \usepackage{longtable}
 \usepackage{booktabs}
-\usepackage{hyperref}
+\usepackage[colorlinks=true, linkcolor=blue]{hyperref}
 \usepackage{parskip}
 \usepackage{listings}
 \usepackage{mdframed}
 \usepackage{pifont}
+\usepackage{tikz}
+\usepackage{tikzpagenodes}
+\usepackage{ragged2e}
+\usepackage{url}
 %\usepackage{lipsum} %remove later
 \doublespacing
 %\setlength\parindent{28 pt}
@@ -55,7 +59,7 @@
 \definecolor{longcol}{HTML}{375623}
 \definecolor{totalrowcol}{HTML}{D9E1F2}
 \definecolor{subtotalcol}{HTML}{F2F2F2}
- 
+\definecolor{rowgray}{gray}{0.93}
 
 % ++++ Convenience macros ++++
 % Severity badge: \sevbadge{colour}{label}
@@ -184,11 +188,18 @@
 % ++++ Cover Page ++++
 
 \begin{titlepage}
+  \begin{tikzpicture}[remember picture, overlay]
+  \draw[line width=1pt]
+    ([shift={(1in,-1in)}]current page.north west)
+    rectangle
+    ([shift={(-1in,1in)}]current page.south east);
+\end{tikzpicture}
 \centering
 \vfill
 
 % ++Logo
-\includegraphics[width=0.35\textwidth]{logo.png}
+\includegraphics[width=0.30\textwidth]{images/icons/logo1.png}
+\includegraphics[width=0.30\textwidth]{images/icons/logo2.png}
 
 \vspace{1.5cm}
 
@@ -218,7 +229,6 @@
 \pagenumbering{arabic} %page one starts here
 \setcounter{page}{1}
 \pagestyle{main} %turn on fancy
-
 
 \vfill
 \textit{++report written with (minimal) help from Claude (Sonnet 4.6)++}
