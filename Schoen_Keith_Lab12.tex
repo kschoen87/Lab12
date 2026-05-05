@@ -21,6 +21,7 @@
 \usepackage{tikzpagenodes}
 \usepackage{ragged2e}
 \usepackage{url}
+\usepackage{seqsplit}
 %\usepackage{lipsum} %remove later
 \doublespacing
 %\setlength\parindent{28 pt}
@@ -212,7 +213,7 @@
 \vspace{0.3cm}
 \large{\textbf{Dr. Daniel Pittman}}\\
 \vspace{0.3cm}
-\large{\textbf{8 May 2026}}\\
+\large{\textbf{5 May 2026}}\\
 \vspace{0.3cm}
 
 \vfill
@@ -220,9 +221,9 @@
 
 % ++++ ToC ++++
 
-\pagenumbering{gobble} %hide page numbers for cover and ToC
-\tableofcontents
-\clearpage
+%\pagenumbering{gobble} %hide page numbers for cover and ToC
+%\tableofcontents
+%\clearpage
 
 % ++++ Begin Report ++++
 
@@ -230,8 +231,158 @@
 \setcounter{page}{1}
 \pagestyle{main} %turn on fancy
 
+% ++++ Triage Memo ++++
+%\begin{notebox}
+\begin{singlespace}
+\section{Security Event Triage Memorandum}
+
+\medskip
+\textbf{\textcolor{headercol}{1.\enspace Engagement Overview}}\\
+Greater Denver Health Partners requested forensic triage of a suspected security event on an internal Windows host.
+Evidence was provided as a Windows Event Log export (.evtx) and received by the examining analyst on 2026-05-04.
+Analysis was conducted per the scenario brief supplied by the client.
+
+\medskip
+\textbf{\textcolor{headercol}{2.\enspace What Was Examined}}\\
+\textbf{Filename:} \texttt{psexec-system-execution.evtx} --- sourced from the \texttt{Microsoft-Windows-Sysmon\\/Operational}
+channel on host \texttt{fs03vuln.offsec.lan} (offsec.lan domain).
+SHA-256 hash recorded at intake: \texttt{2652560B\ldots{}874039886} (see Chain of Custody log).
+Key Event Record IDs examined: 48595, 48596, 48601, and 48605; spanning 2021-12-04T21:17:29Z -- 2021-12-04T21:19:16Z.
+
+\medskip
+\textbf{\textcolor{headercol}{3.\enspace Findings}}\\
+Evidence indicates a threat actor conducted lateral movement onto \texttt{fs03vuln.offsec.lan} using PsExec.
+At 21:17:29Z (EID~48595), \texttt{PsExec64.exe} --- run from \texttt{C:\textbackslash TOOLS\textbackslash} on an attacker-controlled host ---
+dropped the service binary \texttt{PSEXESVC.exe} into \texttt{C:\textbackslash Windows\textbackslash} on the target via SMB Admin Share.
+Immediately following (EID~48596), the Windows Service Control Manager wrote the PSEXESVC service entry to the
+registry with a demand-start value (DWORD \texttt{0x3}), confirming installation.
+At 21:19:16Z, \texttt{PSEXESVC.exe} created a named pipe (EID~48601) and \texttt{PsExec64.exe} connected to it
+(EID~48605), completing a remote command execution session.
+All activity ran under \texttt{S-1-5-18} (SYSTEM), indicating the attacker operated with the highest available local privilege.
+(See IOC Log and ATT\&CK Mapping on following pages.)\\
+\smallskip
+\noindent
+\rowcolors{2}{lightgray}{white}
+\begin{tabularx}{\linewidth}{p{1.8cm} p{4.2cm} p{2.0cm} X}
+  \rowcolor{headercol}
+  \hcell{IOC} & \hcell{Type} & \hcell{PoP Tier} & \hcell{Notes} \\
+  \texttt{\textbackslash PSEXESVC-FS03VULN-2124-stderr} & Named Pipe & Annoying &
+    EID 48605 --- naming tied to PsExec tool behavior \\
+  \texttt{\textbackslash PSEXESVC-FS03VULN-2124-stdout} & Named Pipe & Annoying &
+    EID 48601 --- created by PSEXESVC on target host \\
+  \texttt{C:\textbackslash Windows\textbackslash PSEXESVC.exe} & File Path & Easy & 
+    EID 48595 --- service binary dropped by PsExec64.exe \\
+  \texttt{C:\textbackslash TOOLS\textbackslash PsExec64.exe} & File Path & Easy &
+    EID 48595/48605 --- attacker-side execution binary \\
+  \texttt{HKLM\textbackslash ..\textbackslash Services\textbackslash PSEXESVC\textbackslash Start} & 
+    Registry Key & Annoying & EID 48596 --- SCM demand-start entry (DWORD 0x3) \\
+\end{tabularx}
+
+\medskip
+\textbf{\textcolor{headercol}{4.\enspace ATT\&CK Mapping}}
+
+\smallskip
+\noindent
+\rowcolors{2}{lightgray}{white}
+\begin{tabularx}{\linewidth}{p{1.8cm} p{4.2cm} p{2.0cm} X}
+  \rowcolor{headercol}
+  \hcell{ID} & \hcell{Technique} & \hcell{Tactic} & \hcell{Evidence} \\
+  T1569.002 & System Services: Service Execution & Execution &
+    EID 48595 (file drop); EID 48596 (SCM registry write for PSEXESVC) \\
+  T1021.002 & Remote Services: SMB/Windows Admin Shares & Lateral Movement &
+    EID 48601/48605 (named pipes over SMB); RuleName flags Windows Admin Shares \\
+\end{tabularx}
+
+\medskip
+\textbf{\textcolor{headercol}{5.\enspace Recommendations}}\\
+IT leadership should hunt across all domain-joined workstations for \texttt{PSEXESVC.exe} in \texttt{C:\textbackslash Windows\textbackslash}
+and the registry key \texttt{HKLM\textbackslash System\textbackslash CurrentControlSet\textbackslash Services\textbackslash PSEXESVC}, both reliable indicators of PsExec lateral movement.
+Sysmon EID 17/18 queries filtered for pipe names matching \texttt{\textbackslash PSEXESVC-*} will surface any additional hosts where this technique executed.
+Analysts should audit non-standard directories (e.g., \texttt{C:\textbackslash TOOLS\textbackslash}) for PsExec variants and review SMB logs for internal \texttt{ADMIN\$} share connections.
+Any newly identified hosts should have their event logs preserved immediately before retention windows expire.
+
+\end{singlespace}
+%\end{notebox}
+\newpage
+
+\section{Chain of Custody Log}
+\noindent
+\begin{singlespace}
+\begin{longtable}{>{\bfseries}p{1.0cm} p{1.4cm} p{1.4cm} p{4.2cm} p{3.0cm} p{3.0cm}}
+  \rowcolor{headercol}
+  \color{white}\textbf{Date / Time (UTC)} &
+  \color{white}\textbf{Analyst} &
+  \color{white}\textbf{Action} &
+  \color{white}\textbf{Evidence Item} &
+  \color{white}\textbf{SHA-256 Before} &
+  \color{white}\textbf{SHA-256 After} \\
+  \endfirsthead
+  \rowcolor{headercol}
+  \color{white}\textbf{Date / Time (UTC)} &
+  \color{white}\textbf{Analyst} &
+  \color{white}\textbf{Action} &
+  \color{white}\textbf{Evidence Item} &
+  \color{white}\textbf{SHA-256 Before} &
+  \color{white}\textbf{SHA-256 After} \\
+  \endhead
+  \midrule
+ 
+  \seqsplit{2026-05-04 22:46Z} &
+  Keith Schoen &
+  \seqsplit{lab12-evidence-bundle\_7a166f.zip} &
+  Received bundle through lab posting &
+  Not provided &
+  \seqsplit{615A2D61ACF393F359345B36FC60A822D77B9367E81B2B58852F28478659738F} \\
+
+  \seqsplit{2026-05-04 22:47Z} &
+  Keith Schoen &
+  \seqsplit{MANIFEST.txt} &
+  Extracted to working directory &
+  None Provided &
+  \seqsplit{615A2D61ACF393F359345B36FC60A822D77B9367E81B2B58852F28478659738F} \\
+
+  \seqsplit{2026-05-04 22:47Z} &
+  Keith Schoen &
+  \seqsplit{scenario-brief.txt} &
+  Extracted to working directory &
+  \seqsplit{afa40937c68a8b25a13cddc35a9273b724dd59b14d358289254ae1a92cef56c1} &
+  \seqsplit{AFA40937C68A8B25A13CDDC35A9273B724DD59B14D358289254AE1A92CEF56C1} \\
+
+  \seqsplit{2026-05-04 22:47Z} &
+  Keith Schoen &
+  \seqsplit{psexec-system-execution.evtx} &
+  Extracted to working directory &
+  \seqsplit{2652560b4da35c983974408316b15a5932c6e69fa21a5193c769622874039886} &
+  \seqsplit{2652560B4DA35C983974408316B15A5932C6E69FA21A5193C769622874039886} \\
+
+  \seqsplit{2026-05-04 22:48Z} &
+  Keith Schoen &
+  \seqsplit{scenario-brief.txt} &
+  Review documentation &
+  \seqsplit{afa40937c68a8b25a13cddc35a9273b724dd59b14d358289254ae1a92cef56c1} &
+  \seqsplit{AFA40937C68A8B25A13CDDC35A9273B724DD59B14D358289254AE1A92CEF56C1} \\
+
+  \seqsplit{2026-05-04 23:10Z} &
+  Keith Schoen &
+  \seqsplit{psexec-system-execution.evtx} &
+  Opened file in Event Viewer &
+  \seqsplit{2652560B4DA35C983974408316B15A5932C6E69FA21A5193C769622874039886} &
+  \seqsplit{2652560B4DA35C983974408316B15A5932C6E69FA21A5193C769622874039886} \\
+
+  \seqsplit{2026-04-05 01:18Z} &
+  Keith Schoen &
+  \seqsplit{psexec-system-execution.evtx} &
+  Review four events in Event Viewer &
+  \seqsplit{2652560B4DA35C983974408316B15A5932C6E69FA21A5193C769622874039886} &
+  \seqsplit{2652560B4DA35C983974408316B15A5932C6E69FA21A5193C769622874039886} \\
+ 
+  \bottomrule
+\end{longtable}
+\end{singlespace}
+
+
 \vfill
-\textit{++report written with (minimal) help from Claude (Sonnet 4.6)++}
+\textit{++report written with help from Claude (Sonnet 4.6)++}
 \end{document}
 
 % +++++++++ Helpful stuff +++++++++++
